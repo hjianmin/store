@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>柏松干货商行 - 送货单和收据生成器</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei',
+          sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 10px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 20px;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        margin-bottom: 8px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .header p {
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 15px;
+      }
+
+      .tab {
+        flex: 1;
+        padding: 12px 8px;
+        background: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.3s;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .tab.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .tab:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .form-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        display: none;
+      }
+
+      .form-container.active {
+        display: block;
+      }
+
+      .form-section {
+        margin-bottom: 20px;
+      }
+
+      .form-section h3 {
+        color: #333;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #667eea;
+        font-size: 16px;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .form-group label {
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .form-group input,
+      .form-group textarea {
+        padding: 8px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 13px;
+        transition: border-color 0.3s;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+
+      .items-table th,
+      .items-table td {
+        padding: 8px 6px;
+        text-align: left;
+        border: 1px solid #e0e0e0;
+        font-size: 13px;
+      }
+
+      .items-table th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+      }
+
+      .items-table tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+
+      .items-table input {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+
+      .btn {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin: 4px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+      }
+
+      .btn-danger {
+        background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        color: white;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 8px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+      }
+
+      .total-row {
+        background: #fff3cd !important;
+        font-weight: bold;
+      }
+
+      .info-box {
+        background: #e7f3ff;
+        border-left: 4px solid #2196f3;
+        padding: 12px;
+        margin-bottom: 15px;
+        border-radius: 4px;
+      }
+
+      .info-box p {
+        margin: 4px 0;
+        color: #555;
+        font-size: 13px;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        body {
+          padding: 8px;
+        }
+
+        .header h1 {
+          font-size: 20px;
+        }
+
+        .header p {
+          font-size: 12px;
+        }
+
+        .tabs {
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .tab {
+          padding: 10px;
+          font-size: 13px;
+        }
+
+        .form-container {
+          padding: 15px;
+        }
+
+        .form-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .items-table {
+          font-size: 12px;
+        }
+
+        .items-table th,
+        .items-table td {
+          padding: 6px 4px;
+        }
+
+        .items-table input {
+          padding: 4px;
+          font-size: 12px;
+        }
+
+        .btn {
+          padding: 8px 12px;
+          font-size: 13px;
+          width: 100%;
+          margin: 3px 0;
+        }
+
+        .btn-group {
+          flex-direction: column;
+        }
+
+        .form-section h3 {
+          font-size: 15px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .header h1 {
+          font-size: 18px;
+        }
+
+        .items-table {
+          font-size: 11px;
+        }
+
+        .items-table th {
+          font-size: 11px;
+        }
+
+        /* 小屏幕下优化表格 */
+        .items-table-wrapper {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+        .no-print {
+          display: none;
+        }
+      }
+
+      .amount {
+        font-weight: bold;
+        color: #667eea;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📦 柏松干货商行</h1>
+        <p>送货单和收据生成器</p>
+      </div>
+
+      <div class="tabs no-print">
+        <button class="tab active" onclick="switchTab('delivery')">
+          📋 送货单生成
+        </button>
+        <button class="tab" onclick="switchTab('receipt')">🧾 收据生成</button>
+      </div>
+
+      <!-- 送货单表单 -->
+      <div id="delivery-form" class="form-container active">
+        <div class="info-box">
+          <p>
+            <strong>使用说明：</strong>填写送货单信息后，点击生成按钮即可下载
+            Excel 文件
+          </p>
+        </div>
+
+        <div class="form-section">
+          <h3>基本信息</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>收货单位</label>
+              <input
+                type="text"
+                id="delivery-company"
+                value="名廚餐飲管理有限公司"
+                placeholder="请输入收货单位"
+              />
+            </div>
+            <div class="form-group">
+              <label>收货时间</label>
+              <input
+                type="date"
+                id="delivery-date"
+                onchange="deliveryChange()"
+              />
+            </div>
+            <div class="form-group">
+              <label>商号名称</label>
+              <input
+                type="text"
+                id="delivery-shop"
+                value="柏松干货商行"
+                placeholder="请输入商号名称"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>商品明细</h3>
+          <div
+            class="info-box"
+            style="
+              margin-bottom: 15px;
+              background: #f0f7ff;
+              border-left-color: #667eea;
+            "
+          >
+            <p>
+              <strong>🔍 快速识别：</strong
+              >在下方输入框中粘贴商品文本，系统将自动解析并填充到表格
+            </p>
+            <p style="font-size: 12px; color: #666; margin-top: 5px">
+              格式示例：即食大连辽参12头450条，共37.5斤130一斤
+            </p>
+            <textarea
+              id="quick-input"
+              placeholder="例如：&#10;即食大连辽参12头450条，共37.5斤130一斤&#10;即食8头大连干鲍500只95一个&#10;花胶筒3 KG1070一斤"
+              style="
+                width: 100%;
+                min-height: 100px;
+                margin-top: 10px;
+                padding: 10px;
+                border: 2px solid #667eea;
+                border-radius: 6px;
+                font-size: 13px;
+                resize: vertical;
+                font-family: inherit;
+              "
+            ></textarea>
+            <button
+              class="btn btn-primary"
+              onclick="parseQuickInput()"
+              style="margin-top: 10px"
+            >
+              ⚡ 快速识别并填充
+            </button>
+          </div>
+          <div class="items-table-wrapper">
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th style="width: 40%">名称及规格</th>
+                  <th style="width: 15%">数量</th>
+                  <th style="width: 10%">单位</th>
+                  <th style="width: 15%">单价（元）</th>
+                  <th style="width: 15%">金额（元）</th>
+                  <th style="width: 5%">操作</th>
+                </tr>
+              </thead>
+              <tbody id="delivery-items">
+                <!-- 动态添加行 -->
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="4" style="text-align: right">合计（元）</td>
+                  <td id="delivery-total">0</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <button
+            class="btn btn-primary"
+            onclick="addDeliveryItem()"
+            style="margin-top: 15px"
+          >
+            ➕ 添加商品
+          </button>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="generateDeliveryExcel()">
+            📥 生成送货单 Excel
+          </button>
+          <button class="btn btn-primary" onclick="generateBothExcel()">
+            📦 同时生成送货单和收据
+          </button>
+          <button class="btn btn-danger" onclick="clearDeliveryForm()">
+            🗑️ 清空表单
+          </button>
+        </div>
+      </div>
+
+      <!-- 收据表单 -->
+      <div id="receipt-form" class="form-container">
+        <div class="info-box">
+          <p>
+            <strong>使用说明：</strong>填写收据信息后，点击生成按钮即可下载
+            Excel 文件
+          </p>
+        </div>
+
+        <div class="form-section">
+          <h3>收据信息</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>收据编号</label>
+              <input
+                type="text"
+                id="receipt-no"
+                value=""
+                placeholder="例如: 091101"
+              />
+            </div>
+            <div class="form-group">
+              <label>收款日期</label>
+              <input
+                type="date"
+                id="receipt-date"
+                value=""
+                onchange="updateReceiptNo()"
+              />
+            </div>
+            <div class="form-group">
+              <label>付款单位</label>
+              <input
+                type="text"
+                id="receipt-company"
+                value="名厨餐饮管理公司"
+                placeholder="请输入付款单位"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>收款金额（元）</label>
+              <input
+                type="number"
+                id="receipt-amount"
+                value=""
+                step="0.01"
+                placeholder="输入金额后自动转换大写"
+              />
+            </div>
+            <div class="form-group">
+              <label>金额大写（自动生成）</label>
+              <input
+                type="text"
+                id="receipt-amount-chinese"
+                value=""
+                readonly
+                placeholder="根据左侧金额自动生成"
+                style="background: #f5f5f5"
+              />
+            </div>
+            <div class="form-group">
+              <label>经手人</label>
+              <input
+                type="text"
+                id="receipt-handler"
+                value="彭飞"
+                placeholder="请输入经手人"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>备注</label>
+              <input
+                type="text"
+                id="receipt-remark"
+                value=""
+                placeholder="请输入备注信息"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="generateReceiptExcel()">
+            📥 生成收据 Excel
+          </button>
+          <button class="btn btn-danger" onclick="clearReceiptForm()">
+            🗑️ 清空表单
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 初始化日期
+      document.addEventListener('DOMContentLoaded', function () {
+        const today = new Date()
+        const dateStr = today.toISOString().split('T')[0]
+        document.getElementById('delivery-date').value = dateStr
+        document.getElementById('receipt-date').value = dateStr
+
+        // 生成收据编号：MMDD + 序号
+        updateReceiptNo()
+
+        // 添加初始商品行
+        addDeliveryItem()
+
+        // 监听金额输入，自动转换大写
+        document
+          .getElementById('receipt-amount')
+          .addEventListener('input', function () {
+            const amount = parseFloat(this.value) || 0
+            document.getElementById('receipt-amount-chinese').value =
+              numberToChinese(amount)
+          })
+      })
+
+      // 更新收据编号
+      function updateReceiptNo() {
+        const date = document.getElementById('receipt-date').value
+        if (date) {
+          const dateObj = new Date(date)
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+          const day = String(dateObj.getDate()).padStart(2, '0')
+          const receiptNo = month + day + '01'
+          document.getElementById('receipt-no').value = receiptNo
+        }
+      }
+
+      // 切换标签页
+      function switchTab(tab) {
+        document
+          .querySelectorAll('.tab')
+          .forEach((t) => t.classList.remove('active'))
+        document
+          .querySelectorAll('.form-container')
+          .forEach((f) => f.classList.remove('active'))
+
+        if (tab === 'delivery') {
+          document.querySelectorAll('.tab')[0].classList.add('active')
+          document.getElementById('delivery-form').classList.add('active')
+        } else {
+          document.querySelectorAll('.tab')[1].classList.add('active')
+          document.getElementById('receipt-form').classList.add('active')
+        }
+      }
+
+      function deliveryChange() {
+        document.getElementById('receipt-date').value =
+          document.getElementById('delivery-date').value
+        // 生成收据编号：MMDD + 序号
+        updateReceiptNo()
+      }
+
+      // 添加商品行
+      function addDeliveryItem() {
+        const tbody = document.getElementById('delivery-items')
+        const row = document.createElement('tr')
+        row.innerHTML = `
+                <td><input type="text" class="item-name" placeholder="例如: 乾瑤柱（110頭）"></td>
+                <td><input type="number" class="item-quantity" value="1" min="0" step="1" onchange="calculateAmount(this)"></td>
+                <td><input type="text" class="item-unit" value="斤" placeholder="单位"></td>
+                <td><input type="number" class="item-price" value="0" min="0" step="0.01" onchange="calculateAmount(this)"></td>
+                <td><input type="text" class="item-amount" value="0" readonly></td>
+                <td><button class="btn btn-danger" onclick="removeItem(this)" style="padding: 5px 10px;">删除</button></td>
+            `
+        tbody.appendChild(row)
+      }
+
+      // 计算金额
+      function calculateAmount(input) {
+        const row = input.closest('tr')
+        const quantity =
+          parseFloat(row.querySelector('.item-quantity').value) || 0
+        const price = parseFloat(row.querySelector('.item-price').value) || 0
+        const amount = quantity * price
+        row.querySelector('.item-amount').value = amount.toFixed(2)
+        calculateTotal()
+      }
+
+      // 计算总计
+      function calculateTotal() {
+        let total = 0
+        document.querySelectorAll('.item-amount').forEach((input) => {
+          total += parseFloat(input.value) || 0
+        })
+        document.getElementById('delivery-total').textContent = total.toFixed(2)
+
+        // 自动更新收据金额和大写
+        document.getElementById('receipt-amount').value = total.toFixed(2)
+        document.getElementById('receipt-amount-chinese').value =
+          numberToChinese(total)
+      }
+
+      // 删除商品行
+      function removeItem(btn) {
+        const row = btn.closest('tr')
+        row.remove()
+        calculateTotal()
+      }
+
+      // 数字转中文大写
+      function numberToChinese(num) {
+        if (!num || num === 0) return ''
+
+        const dx = '零壹贰叁肆伍陆柒捌玖'
+        const dw = '分角元拾佰仟万拾佰仟亿拾佰仟'
+
+        // 处理负数
+        let str = ''
+        if (num < 0) {
+          str = '负'
+          num = -num
+        }
+
+        // 转换为分
+        const numFen = Math.round(num * 100)
+
+        let result = str
+        let zeroFlag = false
+        let hasValue = false
+
+        for (let i = 0; i < numFen.toString().length; i++) {
+          const digit = parseInt(numFen.toString()[i])
+          const pos = numFen.toString().length - 1 - i
+
+          if (digit === 0) {
+            if (pos === 2 && !hasValue) {
+              // 整数部分为0
+              result += '零'
+            } else if (pos === 2 || pos === 6 || pos === 10) {
+              // 元、万、亿位
+              if (zeroFlag) {
+                result += dx.charAt(0)
+              }
+              result += dw.charAt(pos)
+              zeroFlag = false
+            } else if (pos < 2) {
+              // 角分位
+              break
+            } else {
+              zeroFlag = true
+            }
+          } else {
+            if (zeroFlag && pos > 2) {
+              result += dx.charAt(0)
+            }
+            result += dx.charAt(digit) + dw.charAt(pos)
+            zeroFlag = false
+            hasValue = true
+          }
+        }
+        // 如果没有小数部分，加"整"
+        const decimal = numFen % 100
+        if (decimal === 0 && hasValue) {
+          result += '整'
+        } else if (decimal > 0) {
+          // 处理小数
+          const jiao = Math.floor(decimal / 10)
+          const fen = decimal % 10
+
+          if (jiao === 0 && fen > 0) {
+            result = result.replace(/零+$/, '') + '零' + dx.charAt(fen) + '分'
+          }
+        }
+
+        return result
+      }
+
+      // 生成送货单 Excel
+      function generateDeliveryExcel() {
+        const company = document.getElementById('delivery-company').value
+        const date = document.getElementById('delivery-date').value
+        const shop = document.getElementById('delivery-shop').value
+
+        if (!company || !date) {
+          alert('请填写完整信息')
+          return
+        }
+
+        const dateObj = new Date(date)
+        const dateStr = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}号`
+
+        // 收集商品数据
+        const items = []
+        document.querySelectorAll('#delivery-items tr').forEach((row) => {
+          const name = row.querySelector('.item-name').value
+          const quantity = row.querySelector('.item-quantity').value
+          const unit = row.querySelector('.item-unit').value
+          const price = row.querySelector('.item-price').value
+          const amount =
+            parseFloat(row.querySelector('.item-amount').value) || 0
+
+          if (name) {
+            items.push({ name, quantity, unit, price, amount })
+          }
+        })
+
+        // 数据行数
+        const dataLength = items.length
+        if (dataLength === 0) {
+          alert('请至少添加一个商品')
+          return
+        }
+
+        // 创建工作簿
+        const wb = XLSX.utils.book_new()
+
+        // 根据源Excel结构准备数据
+        // 第1行: 收货单位 | 公司名 (B1:E1合并)
+        // 第2行: 收货时间 | 日期 (B2:E2合并)
+        // 第3行: 表头
+        // 第4-19行: 数据行(最多16个商品)
+        // 第21行: 合计 (E21有公式)
+
+        const wsData = []
+
+        // 第1行
+        wsData.push(['送货单', '', '', '', ''])
+        // 第2行
+        wsData.push(['收货单位', company, '', '', ''])
+        // 第3行
+        wsData.push(['收货时间', dateStr, '', '', ''])
+        // 第4行 - 表头
+        wsData.push(['名称及规格', '数量', '单位', '单价（元）', '金额（元）'])
+
+        const maxLength = dataLength > 12 ? dataLength : 12
+
+        // 第5-19行 - 数据行（填充实际商品，其余留空）
+        for (let i = 0; i < maxLength + 1; i++) {
+          if (i < items.length) {
+            const item = items[i]
+            // 使用计算好的值，不用公式
+            wsData.push([
+              item.name,
+              parseFloat(item.quantity),
+              item.unit,
+              parseFloat(item.price),
+              item.amount, // 直接使用计算好的值
+            ])
+          } else {
+            wsData.push(['', '', '', '', ''])
+          }
+        }
+
+        // 第20行 - 空行
+        wsData.push(['', '', '', '', ''])
+
+        // 计算总计
+        let totalAmount = 0
+        items.forEach((item) => {
+          totalAmount += item.amount
+        })
+
+        // 第21行 - 合计（使用计算好的值）
+        wsData.push(['合计（元）', '', '', '', totalAmount])
+        console.log(wsData.length)
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+        // 设置列宽（与源文件一致）
+        ws['!cols'] = [
+          { wch: 32 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 20 },
+          { wch: 20 },
+        ]
+
+        // 设置合并单元格（与源文件一致）
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // A1:E1
+          { s: { r: 1, c: 1 }, e: { r: 1, c: 4 } }, // B1:E1
+          { s: { r: 2, c: 1 }, e: { r: 2, c: 4 } }, // B2:E2
+        ]
+
+        // 设置单元格样式（根据源文件精确匹配）
+        const labelStyle = {
+          font: { name: '宋体', sz: 18, bold: true },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const valueStyle = {
+          font: { name: '宋体', sz: 18 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const headerStyle = {
+          font: { name: '宋体', sz: 18, bold: true },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const dataStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const dataCenterStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const dataRightStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { horizontal: 'right', vertical: 'center' },
+          numFmt: '0.00_);[Red]\\(0.00\\)',
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const totalLabelStyle = {
+          font: { name: '宋体', sz: 16, bold: true },
+          alignment: { horizontal: 'right', vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const totalValueStyle = {
+          font: { name: '宋体', sz: 16, bold: true },
+          alignment: { horizontal: 'right', vertical: 'center' },
+          numFmt: '0.00_);[Red]\\(0.00\\)',
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        // 应用样式
+        // 第1-3行：标签和值
+        ws['A1'].s = labelStyle
+        ws['B1'].s = labelStyle
+        ws['C1'].s = labelStyle
+        ws['D1'].s = labelStyle
+        ws['E1'].s = labelStyle
+
+        ws['A2'].s = labelStyle
+        ws['B2'].s = valueStyle
+        ws['C2'].s = valueStyle
+        ws['D2'].s = valueStyle
+        ws['E2'].s = valueStyle
+
+        ws['A3'].s = labelStyle
+        ws['B3'].s = valueStyle
+        ws['C3'].s = valueStyle
+        ws['D3'].s = valueStyle
+        ws['E3'].s = valueStyle
+
+        // 第3行：表头
+        for (let col = 0; col < 5; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 3, c: col })
+          if (ws[cellAddress]) {
+            ws[cellAddress].s = headerStyle
+          }
+        }
+
+        // 数据行（第4-17行）
+        for (let row = 4; row < wsData.length; row++) {
+          for (let col = 0; col < 5; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
+            if (row < wsData.length - 1) {
+              if (ws[cellAddress]) {
+                if (col === 0) {
+                  ws[cellAddress].s = dataStyle
+                } else if (col === 1) {
+                  ws[cellAddress].s = dataRightStyle
+                } else if (col === 2) {
+                  ws[cellAddress].s = dataCenterStyle
+                } else if (col === 3 || col === 4) {
+                  ws[cellAddress].s = dataRightStyle
+                }
+              }
+            } else {
+              ws[cellAddress].s = totalLabelStyle
+            }
+          }
+        }
+
+        XLSX.utils.book_append_sheet(wb, ws, '送货单')
+
+        // 生成文件名
+        const fileName = `${shop}${date}送货单.xlsx`
+
+        // 下载文件
+        XLSX.writeFile(wb, fileName)
+
+        alert('送货单已生成: ' + fileName)
+      }
+
+      // 生成收据 Excel
+      function generateReceiptExcel() {
+        const receiptNo = document.getElementById('receipt-no').value
+        const date = document.getElementById('receipt-date').value
+        const company = document.getElementById('receipt-company').value
+        const amount =
+          parseFloat(document.getElementById('receipt-amount').value) || 0
+        const amountChinese = document.getElementById(
+          'receipt-amount-chinese',
+        ).value
+        const handler = document.getElementById('receipt-handler').value
+        const remark = document.getElementById('receipt-remark').value
+        const shop = document.getElementById('delivery-shop').value
+
+        if (!receiptNo || !date || !company || amount <= 0) {
+          alert('请填写完整信息')
+          return
+        }
+
+        const dateObj = new Date(date)
+        const dateStr = `${dateObj.getFullYear()} 年 ${String(dateObj.getMonth() + 1).padStart(2, '0')} 月 ${String(dateObj.getDate()).padStart(2, '0')} 日`
+
+        // 创建工作簿
+        const wb = XLSX.utils.book_new()
+
+        // 根据源Excel结构准备数据（10行，6列）
+        // A1:E1 合并 - "收据"
+        // D2:E2 合并 - "No: 091101"
+        // A3:E3 合并 - 日期
+        // A4:E4 合并 - 收款内容
+        // A5:E5 合并 - 空行
+        // A6:E6 合并 - 空行
+        // A7:E7 合并 - 空行
+        // A8: 金额(大写) B8:E8 合并 - 金额大写
+        // A9: 备注 B9:E9 合并 - 备注
+        // A10-E10: 签名
+
+        const wsData = [
+          ['收据', '', '', '', '', ''], // 第1行 A1:E1合并
+          ['', '', '', `No:\t${receiptNo}`, '', ''], // 第2行 D2:E2合并
+          [dateStr, '', '', '', '', ''], // 第3行 A3:E3合并
+          [
+            `    今收到 ${company} 的货款 ${amount.toFixed(2)} 元`,
+            '',
+            '',
+            '',
+            '',
+            '',
+          ], // 第4行 A4:E4合并
+          ['', '', '', '', '', ''], // 第5行 A5:E5合并
+          ['', '', '', '', '', ''], // 第6行 A6:E6合并
+          ['', '', '', '', '', ''], // 第7行 A7:E7合并
+          ['金额(大写)', amountChinese, '', '', '', ''], // 第8行 B8:E8合并
+          ['备注', remark || '￥' + amount.toFixed(2), '', '', '', ''], // 第9行 B9:E9合并
+          ['核准', '会计', '记帐', '出纳', `经手人：${handler}`, ''], // 第10行
+        ]
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+        // 设置列宽
+        ws['!cols'] = [
+          { wch: 15 },
+          { wch: 12 },
+          { wch: 10 },
+          { wch: 18 },
+          { wch: 18 },
+          { wch: 10 },
+        ]
+
+        // 设置合并单元格（与源文件完全一致）
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // A1:E1 收据标题
+          { s: { r: 1, c: 3 }, e: { r: 1, c: 4 } }, // D2:E2 编号
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } }, // A3:E3 日期
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } }, // A4:E4 收款内容
+          { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } }, // A5:E5 空行
+          { s: { r: 5, c: 0 }, e: { r: 5, c: 4 } }, // A6:E6 空行
+          { s: { r: 6, c: 0 }, e: { r: 6, c: 4 } }, // A7:E7 空行
+          { s: { r: 7, c: 1 }, e: { r: 7, c: 4 } }, // B8:E8 金额大写
+          { s: { r: 8, c: 1 }, e: { r: 8, c: 4 } }, // B9:E9 备注
+        ]
+
+        // 设置单元格样式（根据源文件精确匹配）
+        const titleStyle = {
+          font: { name: '宋体', sz: 18, bold: true },
+          alignment: { horizontal: 'center', vertical: 'center' },
+        }
+
+        const noStyle = {
+          font: { name: '宋体', sz: 14, bold: true },
+          alignment: { horizontal: 'right', vertical: 'center' },
+        }
+
+        const dateStyle = {
+          font: { name: '宋体', sz: 14, bold: true },
+          alignment: { horizontal: 'center', vertical: 'center' },
+        }
+
+        const contentStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const amountLabelStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const amountValueStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const remarkLabelStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const remarkValueStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { horizontal: 'right', vertical: 'center' },
+          border: {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          },
+        }
+
+        const footerStyle = {
+          font: { name: '宋体', sz: 14 },
+          alignment: { vertical: 'center' },
+        }
+
+        // 应用样式
+        ws['A1'].s = titleStyle
+
+        ws['D2'].s = noStyle
+
+        ws['A3'].s = dateStyle
+        for (let row = 3; row < 9; row++) {
+          for (let col = 0; col < 5; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
+            if (row < 7) {
+              ws[cellAddress].s = contentStyle
+            } else if (row == 7) {
+              if (col == 0) {
+                ws[cellAddress].s = amountLabelStyle
+              } else {
+                ws[cellAddress].s = amountValueStyle
+              }
+            } else {
+              if (col == 0) {
+                ws[cellAddress].s = remarkLabelStyle
+              } else {
+                ws[cellAddress].s = remarkValueStyle
+              }
+            }
+          }
+        }
+
+        // 底部签名行
+        for (let col = 0; col < 5; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 9, c: col })
+          if (ws[cellAddress]) {
+            ws[cellAddress].s = footerStyle
+          }
+        }
+
+        XLSX.utils.book_append_sheet(wb, ws, '收据')
+
+        // 生成文件名
+        const dateNum = date.replace(/-/g, '')
+        const fileName = `${shop}${dateNum}收据.xlsx`
+
+        // 下载文件
+        XLSX.writeFile(wb, fileName)
+
+        alert('收据已生成: ' + fileName)
+      }
+
+      // 同时生成送货单和收据
+      function generateBothExcel() {
+        generateDeliveryExcel()
+        setTimeout(() => {
+          generateReceiptExcel()
+        }, 500)
+      }
+
+      // 解析快速输入
+      function parseQuickInput() {
+        const input = document.getElementById('quick-input').value.trim()
+        if (!input) {
+          alert('请输入商品文本')
+          return
+        }
+
+        // 按行分割
+        const lines = input.split('\n').filter((line) => line.trim())
+
+        // 清空现有商品行
+        document.getElementById('delivery-items').innerHTML = ''
+
+        lines.forEach((line) => {
+          const parsed = parseLine(line.trim())
+          if (parsed) {
+            addDeliveryItemWithValues(parsed)
+          }
+        })
+
+        // 清空输入框
+        document.getElementById('quick-input').value = ''
+        calculateTotal()
+
+        // 提示成功
+        const count = lines.length
+        alert(`成功识别 ${count} 个商品，已填充到表格中`)
+      }
+
+      // 解析单行文本
+      function parseLine(line) {
+        // 智能解析逻辑
+        // 例如：即食大连辽参12头450条，共37.5斤130一斤
+        // 例如：即食8头大连干鲍500只95一个
+        // 例如：花胶筒3 KG1070一斤
+
+        let name = ''
+        let quantity = 0
+        let unit = '斤'
+        let price = 0
+
+        // 策略1: 匹配 "共X斤Y一斤" 或 "X斤Y一斤" (最后的数量和价格)
+        const pattern1 =
+          /共([\d.]+)\s*(斤|kg|千克|公斤)\s*([\d.]+)\s*(?:一斤|元|块)?$/i
+        const match1 = line.match(pattern1)
+
+        if (match1) {
+          // 找到"共X斤Y"模式
+          quantity = parseFloat(match1[1])
+          unit = match1[2] || '斤'
+          price = parseFloat(match1[3])
+
+          // 名称是"共"之前的所有内容
+          const共Index = line.indexOf('共')
+          name = line.substring(0, 共Index).trim()
+          // 去除名称末尾的标点
+          name = name.replace(/[,，;；。]*$/, '').trim()
+        } else {
+          // 策略2: 匹配 "X kg/千克/公斤 Y一斤" 模式
+          const pattern2 =
+            /([\d.]+)\s*(kg|千克|公斤)\s*([\d.]+)\s*(?:一斤|元|块)?$/i
+          const match2 = line.match(pattern2)
+
+          if (match2) {
+            quantity = parseFloat(match2[1])
+            unit = match2[2]
+            price = parseFloat(match2[3])
+            name = line.substring(0, line.indexOf(match2[0])).trim()
+            name = name.replace(/[,，;；。]*$/, '').trim()
+          } else {
+            // 策略3: 匹配 "X斤Y" 模式(没有"共"字)
+            const pattern3 = /([\d.]+)\s*(斤)\s*([\d.]+)\s*(?:一斤|元|块)?$/i
+            const match3 = line.match(pattern3)
+
+            if (match3) {
+              quantity = parseFloat(match3[1])
+              unit = match3[2]
+              price = parseFloat(match3[3])
+              name = line.substring(0, line.indexOf(match3[0])).trim()
+              name = name.replace(/[,，;；。]*$/, '').trim()
+            } else {
+              // 策略3b: 匹配 "X斤。Y" 模式(句号分隔)
+              // 例如：黄鱼胶10斤。920
+              const pattern3b = /([\d.]+)\s*(斤)[。，]?\s*([\d.]+)\s*$/i
+              const match3b = line.match(pattern3b)
+
+              if (match3b) {
+                quantity = parseFloat(match3b[1])
+                unit = match3b[2]
+                price = parseFloat(match3b[3])
+                name = line.substring(0, line.indexOf(match3b[0])).trim()
+                name = name.replace(/[,，;；。]*$/, '').trim()
+              } else {
+                // 策略3c: 匹配 "X斤(规格)Y" 模式(括号内是规格说明)
+                // 例如：羊肚菌3斤（320头/斤）360
+                const pattern3c =
+                  /([\d.]+)\s*(斤)[(（]([^)）]+)[)）]\s*([\d.]+)\s*$/i
+                const match3c = line.match(pattern3c)
+
+                if (match3c) {
+                  quantity = parseFloat(match3c[1])
+                  unit = match3c[2]
+                  const spec = match3c[3] // 规格说明，如 "320头/斤"
+                  price = parseFloat(match3c[4])
+
+                  // 名称 = 前面部分 + (规格)
+                  const namePart = line
+                    .substring(0, line.indexOf(match3c[0]))
+                    .trim()
+                  name = `${namePart}（${spec}）`
+                    .replace(/[,，;；。]*$/, '')
+                    .trim()
+                } else {
+                  // 策略4: 匹配 "X个/只/条 Y一个" 模式
+                  // 例如：即食8头大连干鲍500只95一个
+                  const pattern4 =
+                    /([\d.]+)\s*(个|只|条|包|袋|箱|盒)\s*([\d.]+)\s*(?:一个|一斤|元|块|每)?$/i
+                  const match4 = line.match(pattern4)
+
+                  if (match4) {
+                    quantity = parseFloat(match4[1])
+                    unit = match4[2]
+                    price = parseFloat(match4[3])
+                    name = line.substring(0, line.indexOf(match4[0])).trim()
+                    name = name.replace(/[,，;；。]*$/, '').trim()
+                  } else {
+                    // 策略5: 匹配 "X个/只/条，Y" 模式(单价没有后缀)
+                    // 例如：10头大连鲍（即食）300只，75
+                    const pattern5 =
+                      /([\d.]+)\s*(个|只|条|包|袋|箱|盒|斤|kg|千克|公斤)[,，;；]?\s*([\d.]+)\s*$/i
+                    const match5 = line.match(pattern5)
+
+                    if (match5) {
+                      quantity = parseFloat(match5[1])
+                      unit = match5[2]
+                      price = parseFloat(match5[3])
+                      name = line.substring(0, line.indexOf(match5[0])).trim()
+                      name = name.replace(/[,，;；。]*$/, '').trim()
+                    } else {
+                      // 无法解析,整个文本作为名称
+                      name = line.replace(/[,，;；。]*$/, '').trim()
+                      quantity = 0
+                      price = 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // 标准化单位:KG转换为斤,数量*2
+        if (
+          unit.toLowerCase() === 'kg' ||
+          unit.toLowerCase() === '千克' ||
+          unit.toLowerCase() === '公斤'
+        ) {
+          quantity = quantity * 2 // 1kg = 2斤
+          unit = '斤'
+        }
+
+        return {
+          name: name || '未识别商品',
+          quantity: quantity || 0,
+          unit: unit || '斤',
+          price: price || 0,
+        }
+      }
+
+      // 添加带有预设值的商品行
+      function addDeliveryItemWithValues(values) {
+        const tbody = document.getElementById('delivery-items')
+        const row = document.createElement('tr')
+        row.innerHTML = `
+          <td><input type="text" class="item-name" value="${values.name}" placeholder="例如: 乾瑤柱（110頭）"></td>
+          <td><input type="number" class="item-quantity" value="${values.quantity}" min="0" step="0.01" onchange="calculateAmount(this)"></td>
+          <td><input type="text" class="item-unit" value="${values.unit}" placeholder="单位"></td>
+          <td><input type="number" class="item-price" value="${values.price}" min="0" step="0.01" onchange="calculateAmount(this)"></td>
+          <td><input type="text" class="item-amount" value="0" readonly></td>
+          <td><button class="btn btn-danger" onclick="removeItem(this)" style="padding: 5px 10px;">删除</button></td>
+        `
+        tbody.appendChild(row)
+
+        // 计算金额
+        const amount = values.quantity * values.price
+        row.querySelector('.item-amount').value = amount.toFixed(2)
+      }
+
+      // 清空送货单表单
+      function clearDeliveryForm() {
+        if (confirm('确定要清空表单吗？')) {
+          document.getElementById('delivery-items').innerHTML = ''
+          document.getElementById('delivery-total').textContent = '0'
+          document.getElementById('quick-input').value = ''
+          addDeliveryItem()
+        }
+      }
+
+      // 清空收据表单
+      function clearReceiptForm() {
+        if (confirm('确定要清空表单吗？')) {
+          document.getElementById('receipt-no').value = ''
+          document.getElementById('receipt-amount').value = ''
+          document.getElementById('receipt-amount-chinese').value = ''
+          document.getElementById('receipt-remark').value = ''
+        }
+      }
+    </script>
+  </body>
+</html>
